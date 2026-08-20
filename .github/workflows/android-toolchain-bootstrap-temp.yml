@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Setup Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
@@ -26,6 +26,7 @@ jobs:
           mv "$RUNNER_TEMP/cmdline/cmdline-tools" "$SDK/cmdline-tools/latest"
           yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$SDK" --licenses >/dev/null || true
           "$SDK/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$SDK" "platforms;android-35" "build-tools;35.0.0"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
           echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
 
       - name: Install Gradle 8.9
@@ -83,8 +84,8 @@ jobs:
           set -euxo pipefail
           OUT="$RUNNER_TEMP/android-offline-v152"
           mkdir -p "$OUT/sdk/platforms" "$OUT/sdk/build-tools" "$OUT/gradle" "$OUT/gradle-home"
-          cp -a "$ANDROID_SDK_ROOT/platforms/android-35" "$OUT/sdk/platforms/"
-          cp -a "$ANDROID_SDK_ROOT/build-tools/35.0.0" "$OUT/sdk/build-tools/"
+          cp -a "$ANDROID_HOME/platforms/android-35" "$OUT/sdk/platforms/"
+          cp -a "$ANDROID_HOME/build-tools/35.0.0" "$OUT/sdk/build-tools/"
           cp -a "$RUNNER_TEMP/gradle-8.9" "$OUT/gradle/"
           cp -a "$HOME/.gradle/caches" "$OUT/gradle-home/"
           find "$OUT" -type f -name '*.lock' -delete
