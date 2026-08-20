@@ -1,0 +1,118 @@
+name: Android toolchain V152 temp
+
+on:
+  push:
+    branches:
+      - tooling/android-build-v152-temp
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install Android SDK 35 and build-tools
+        shell: bash
+        run: |
+          set -euxo pipefail
+          SDK="$RUNNER_TEMP/android-sdk"
+          mkdir -p "$SDK/cmdline-tools"
+          curl -fsSL -o "$RUNNER_TEMP/cmdline.zip" https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+          unzip -q "$RUNNER_TEMP/cmdline.zip" -d "$RUNNER_TEMP/cmdline"
+          mv "$RUNNER_TEMP/cmdline/cmdline-tools" "$SDK/cmdline-tools/latest"
+          yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$SDK" --licenses >/dev/null || true
+          "$SDK/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$SDK" "platforms;android-35" "build-tools;35.0.0"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
+
+      - name: Install Gradle 8.9
+        shell: bash
+        run: |
+          set -euxo pipefail
+          curl -fsSL -o "$RUNNER_TEMP/gradle.zip" https://services.gradle.org/distributions/gradle-8.9-bin.zip
+          unzip -q "$RUNNER_TEMP/gradle.zip" -d "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/gradle-8.9/bin" >> "$GITHUB_PATH"
+
+      - name: Warm exact Android dependencies
+        shell: bash
+        run: |
+          set -euxo pipefail
+          P="$RUNNER_TEMP/warm-project"
+          mkdir -p "$P/app/src/main/java/com/example/warm"
+          cat > "$P/settings.gradle" <<'EOF'
+          pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
+          dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }
+          rootProject.name='warm'
+          include ':app'
+          EOF
+          cat > "$P/gradle.properties" <<'EOF'
+          android.useAndroidX=true
+          android.nonTransitiveRClass=true
+          EOF
+          cat > "$P/build.gradle" <<'EOF'
+          plugins { id 'com.android.application' version '8.7.3' apply false }
+          EOF
+          cat > "$P/app/build.gradle" <<'EOF'
+          plugins { id 'com.android.application' }
+          android {
+              namespace 'com.example.warm'
+              compileSdk 35
+              defaultConfig { applicationId 'com.example.warm'; minSdk 24; targetSdk 35; versionCode 1; versionName '1' }
+              buildTypes { release { minifyEnabled true; shrinkResources true; proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro' } }
+              compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+          }
+          dependencies {
+              implementation 'androidx.activity:activity:1.10.1'
+              implementation 'androidx.core:core:1.15.0'
+              implementation 'com.journeyapps:zxing-android-embedded:4.3.0'
+              testImplementation 'junit:junit:4.13.2'
+          }
+          EOF
+          : > "$P/app/proguard-rules.pro"
+          cat > "$P/app/src/main/AndroidManifest.xml" <<'EOF'
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android"><application><activity android:name=".MainActivity" android:exported="true"/></application></manifest>
+          EOF
+          cat > "$P/app/src/main/java/com/example/warm/MainActivity.java" <<'EOF'
+          package com.example.warm; public class MainActivity extends android.app.Activity {}
+          EOF
+          cd "$P"
+          gradle --no-daemon :app:assembleRelease :app:testReleaseUnitTest
+
+      - name: Package split portable toolchain
+        shell: bash
+        run: |
+          set -euxo pipefail
+          find "$HOME/.gradle/caches" -type f -name '*.lock' -delete
+          tar -C "$ANDROID_HOME" -czf "$RUNNER_TEMP/android-sdk-v152.tar.gz" platforms/android-35 build-tools/35.0.0 build-tools/34.0.0 licenses 2>/dev/null || tar -C "$ANDROID_HOME" -czf "$RUNNER_TEMP/android-sdk-v152.tar.gz" platforms/android-35 build-tools/35.0.0 licenses
+          tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/gradle-8.9-v152.tar.gz" gradle-8.9
+          tar -C "$HOME/.gradle" -czf "$RUNNER_TEMP/gradle-cache-v152.tar.gz" caches
+          ls -lh "$RUNNER_TEMP"/*v152.tar.gz
+          sha256sum "$RUNNER_TEMP"/*v152.tar.gz
+
+      - name: Upload SDK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-sdk-v152
+          path: ${{ runner.temp }}/android-sdk-v152.tar.gz
+          retention-days: 1
+          compression-level: 0
+
+      - name: Upload Gradle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-8.9-v152
+          path: ${{ runner.temp }}/gradle-8.9-v152.tar.gz
+          retention-days: 1
+          compression-level: 0
+
+      - name: Upload Gradle cache artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-cache-v152
+          path: ${{ runner.temp }}/gradle-cache-v152.tar.gz
+          retention-days: 1
+          compression-level: 0
