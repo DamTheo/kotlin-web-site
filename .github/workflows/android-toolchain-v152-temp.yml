@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - tooling/android-build-v152-temp
+  pull_request:
+    branches:
+      - master
 
 jobs:
   prepare:
@@ -86,10 +89,9 @@ jobs:
         run: |
           set -euxo pipefail
           OUT="$RUNNER_TEMP/android-offline-v152"
-          mkdir -p "$OUT/sdk/platforms" "$OUT/sdk/build-tools" "$OUT/sdk/platform-tools" "$OUT/gradle" "$OUT/gradle-home"
+          mkdir -p "$OUT/sdk/platforms" "$OUT/sdk/build-tools" "$OUT/gradle" "$OUT/gradle-home"
           cp -a "$ANDROID_SDK_ROOT/platforms/android-35" "$OUT/sdk/platforms/"
           cp -a "$ANDROID_SDK_ROOT/build-tools/35.0.0" "$OUT/sdk/build-tools/"
-          cp -a "$ANDROID_SDK_ROOT/platform-tools" "$OUT/sdk/"
           cp -a "$RUNNER_TEMP/gradle-8.9" "$OUT/gradle/"
           cp -a "$HOME/.gradle/caches" "$OUT/gradle-home/"
           cp -a "$HOME/.gradle/wrapper" "$OUT/gradle-home/" 2>/dev/null || true
