@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - tooling/android-build-v152-temp
-  pull_request:
-    branches:
-      - master
 
 jobs:
   prepare:
@@ -18,7 +15,7 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Install Android SDK 35 and build-tools 35.0.0
+      - name: Install Android SDK 35 and build-tools
         shell: bash
         run: |
           set -euxo pipefail
@@ -85,27 +82,37 @@ jobs:
           cd "$P"
           gradle --no-daemon :app:assembleRelease :app:testReleaseUnitTest
 
-      - name: Package portable offline toolchain
+      - name: Package split portable toolchain
         shell: bash
         run: |
           set -euxo pipefail
-          OUT="$RUNNER_TEMP/android-offline-v152"
-          mkdir -p "$OUT/sdk/platforms" "$OUT/sdk/build-tools" "$OUT/gradle" "$OUT/gradle-home"
-          cp -a "$ANDROID_HOME/platforms/android-35" "$OUT/sdk/platforms/"
-          cp -a "$ANDROID_HOME/build-tools/35.0.0" "$OUT/sdk/build-tools/"
-          cp -a "$ANDROID_HOME/build-tools/34.0.0" "$OUT/sdk/build-tools/" 2>/dev/null || true
-          cp -a "$RUNNER_TEMP/gradle-8.9" "$OUT/gradle/"
-          cp -a "$HOME/.gradle/caches" "$OUT/gradle-home/"
-          find "$OUT" -type f -name '*.lock' -delete
-          tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/android-offline-v152.tar.gz" android-offline-v152
-          sha256sum "$RUNNER_TEMP/android-offline-v152.tar.gz" > "$RUNNER_TEMP/android-offline-v152.tar.gz.sha256"
+          find "$HOME/.gradle/caches" -type f -name '*.lock' -delete
+          tar -C "$ANDROID_HOME" -czf "$RUNNER_TEMP/android-sdk-v152.tar.gz" platforms/android-35 build-tools/35.0.0 build-tools/34.0.0 licenses 2>/dev/null || tar -C "$ANDROID_HOME" -czf "$RUNNER_TEMP/android-sdk-v152.tar.gz" platforms/android-35 build-tools/35.0.0 licenses
+          tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/gradle-8.9-v152.tar.gz" gradle-8.9
+          tar -C "$HOME/.gradle" -czf "$RUNNER_TEMP/gradle-cache-v152.tar.gz" caches
+          ls -lh "$RUNNER_TEMP"/*v152.tar.gz
+          sha256sum "$RUNNER_TEMP"/*v152.tar.gz
 
-      - name: Upload toolchain artifact
+      - name: Upload SDK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: android-offline-v152
-          path: |
-            ${{ runner.temp }}/android-offline-v152.tar.gz
-            ${{ runner.temp }}/android-offline-v152.tar.gz.sha256
+          name: android-sdk-v152
+          path: ${{ runner.temp }}/android-sdk-v152.tar.gz
+          retention-days: 1
+          compression-level: 0
+
+      - name: Upload Gradle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-8.9-v152
+          path: ${{ runner.temp }}/gradle-8.9-v152.tar.gz
+          retention-days: 1
+          compression-level: 0
+
+      - name: Upload Gradle cache artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-cache-v152
+          path: ${{ runner.temp }}/gradle-cache-v152.tar.gz
           retention-days: 1
           compression-level: 0
