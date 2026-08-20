@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Setup Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
@@ -28,7 +28,8 @@ jobs:
           unzip -q "$RUNNER_TEMP/cmdline.zip" -d "$RUNNER_TEMP/cmdline"
           mv "$RUNNER_TEMP/cmdline/cmdline-tools" "$SDK/cmdline-tools/latest"
           yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$SDK" --licenses >/dev/null || true
-          "$SDK/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$SDK" "platforms;android-35" "build-tools;35.0.0" "platform-tools"
+          "$SDK/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$SDK" "platforms;android-35" "build-tools;35.0.0"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
           echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
 
       - name: Install Gradle 8.9
@@ -52,9 +53,7 @@ jobs:
           include ':app'
           EOF
           cat > "$P/build.gradle" <<'EOF'
-          plugins {
-              id 'com.android.application' version '8.7.3' apply false
-          }
+          plugins { id 'com.android.application' version '8.7.3' apply false }
           EOF
           cat > "$P/app/build.gradle" <<'EOF'
           plugins { id 'com.android.application' }
@@ -72,11 +71,9 @@ jobs:
               testImplementation 'junit:junit:4.13.2'
           }
           EOF
-          cat > "$P/app/proguard-rules.pro" <<'EOF'
-          # warm cache only
-          EOF
+          : > "$P/app/proguard-rules.pro"
           cat > "$P/app/src/main/AndroidManifest.xml" <<'EOF'
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android"><application android:theme="@android:style/Theme.Material.Light.NoActionBar"><activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity></application></manifest>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android"><application><activity android:name=".MainActivity" android:exported="true"/></application></manifest>
           EOF
           cat > "$P/app/src/main/java/com/example/warm/MainActivity.java" <<'EOF'
           package com.example.warm; public class MainActivity extends android.app.Activity {}
@@ -90,11 +87,10 @@ jobs:
           set -euxo pipefail
           OUT="$RUNNER_TEMP/android-offline-v152"
           mkdir -p "$OUT/sdk/platforms" "$OUT/sdk/build-tools" "$OUT/gradle" "$OUT/gradle-home"
-          cp -a "$ANDROID_SDK_ROOT/platforms/android-35" "$OUT/sdk/platforms/"
-          cp -a "$ANDROID_SDK_ROOT/build-tools/35.0.0" "$OUT/sdk/build-tools/"
+          cp -a "$ANDROID_HOME/platforms/android-35" "$OUT/sdk/platforms/"
+          cp -a "$ANDROID_HOME/build-tools/35.0.0" "$OUT/sdk/build-tools/"
           cp -a "$RUNNER_TEMP/gradle-8.9" "$OUT/gradle/"
           cp -a "$HOME/.gradle/caches" "$OUT/gradle-home/"
-          cp -a "$HOME/.gradle/wrapper" "$OUT/gradle-home/" 2>/dev/null || true
           find "$OUT" -type f -name '*.lock' -delete
           tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/android-offline-v152.tar.gz" android-offline-v152
           sha256sum "$RUNNER_TEMP/android-offline-v152.tar.gz" > "$RUNNER_TEMP/android-offline-v152.tar.gz.sha256"
