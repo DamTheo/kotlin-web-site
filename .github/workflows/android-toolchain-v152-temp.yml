@@ -52,6 +52,10 @@ jobs:
           rootProject.name='warm'
           include ':app'
           EOF
+          cat > "$P/gradle.properties" <<'EOF'
+          android.useAndroidX=true
+          android.nonTransitiveRClass=true
+          EOF
           cat > "$P/build.gradle" <<'EOF'
           plugins { id 'com.android.application' version '8.7.3' apply false }
           EOF
@@ -89,6 +93,7 @@ jobs:
           mkdir -p "$OUT/sdk/platforms" "$OUT/sdk/build-tools" "$OUT/gradle" "$OUT/gradle-home"
           cp -a "$ANDROID_HOME/platforms/android-35" "$OUT/sdk/platforms/"
           cp -a "$ANDROID_HOME/build-tools/35.0.0" "$OUT/sdk/build-tools/"
+          cp -a "$ANDROID_HOME/build-tools/34.0.0" "$OUT/sdk/build-tools/" 2>/dev/null || true
           cp -a "$RUNNER_TEMP/gradle-8.9" "$OUT/gradle/"
           cp -a "$HOME/.gradle/caches" "$OUT/gradle-home/"
           find "$OUT" -type f -name '*.lock' -delete
